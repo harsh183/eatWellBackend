@@ -3,20 +3,21 @@ require 'icalendar'
 require 'pry'
 require 'net/http'
 
+@distance_cache = {} # Store the results so that we don't end up hitting the server again and again
+
 # TODO: See if it's possible to split this into multiple files
 # TODO: Consider the actual meal timings of all the dining halls (get it somehow from uiuc website)
 # TODO: Put all the meal scheduling things onto their own module or class
 # TODO: Make variables consistent
+# TODO: Make code less tightly coupled
 
 # TODO: Also make a more simplified route that just gets it for a single days worth of events
 
 class Utility
   def get_final_string
-    "I've been expecting you"
+    "Execute order 66" # TODO: Placeholder for now, put some other status thing later
   end
 end
-
-@distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
 # Represents a single calendar event for the sake of our app
 class StudentEvent
@@ -42,6 +43,7 @@ class StudentEvent
   end
 end
 
+# Represents a day of events alongside a date.
 class DayEvents
   attr_accessor :student_events, :date
 
@@ -105,7 +107,9 @@ def find_meal_timings(day_events)
     end
 
     meal_timing.summary = meals[index]
-    meal_timing.location = "Dining Hall" # MAHA TODO: Get location based on proximity there and to next class
+    before_hall = find_location_before(meal_timing, day_events)
+    after_hall = find_location_after(meal_timing, day_events)
+    meal_timing.location = find_dining_hall_with_least_walking_time(before_hall, after_hall)
     meals_for_day.push meal_timing
   end
 
@@ -161,6 +165,59 @@ end
 def convert_weekday_index_to_ics(weekday_id)
   mapping = %w{MO TU WE TH FR SA SU}
   mapping[weekday_id]
+end
+
+# TODO: The next two functions are a little hacky (well what isn't) but fix them (maybe store these at time of creator)
+def find_location_before(time, day_events)
+  location_before = "" # Placeholder
+  min_diffence = 120 # Placeholder
+  day_events.each do |event|
+    difference = time - event.end_time
+    if difference > 0
+      if (difference < min_diffence)
+        min_diffence = difference
+        location_before = event.location
+      end
+    end
+  end
+
+  location_before
+end
+
+def find_location_after(time, day_events)
+  location_after = "" # Placeholder
+  min_diffence = 120 # Placeholder
+  day_events.each do |event|
+    difference = event.start_time - event
+    if difference > 0
+      if (difference < min_diffence)
+        min_diffence = difference
+        location_after = event.location
+      end
+    end
+  end
+
+  location_after
+end
+
+def find_dining_hall_with_least_walking_time(location_before, location_after)
+  dining_halls = ["Busey-Evans Dining Hall",
+                  "Florida Avenue (FAR) Dining Hall",
+                  "Illini Union",
+                  "Lincoln Avenue (LAR) Dining Hall",
+                  "Ikenberry Dining Center - SDRP",
+                  "Pennsylvania Avenue (PAR) Dining Hall"]
+  min_time = 120 # Some large value TODO: This is terrible code
+  least_walking_hall = "University dining" # Placeholder value
+  dining_halls.each do |hall|
+    time = query_walking_distance(before, hall) + query_walking_distance(after, hall)
+    if time < min_time
+      least_walking_hall = hall
+      min_time = time
+    end
+  end
+
+  return least_walking_hall
 end
 
 def query_walking_distance(place1, place2)
