@@ -41,6 +41,10 @@ class StudentEvent
   def duration
     (@end_time / 100 - @start_time / 100) * 60 + (@end_time % 100 - @start_time % 100)
   end
+
+  def to_s
+    "#{@summary} at #{@location} from #{@start_time} to #{@end_time}"
+  end
 end
 
 # Represents a day of events alongside a date.
@@ -55,13 +59,14 @@ class DayEvents
   def pick_out_given_days_events(all_events_list)
     all_events_list.each do |event|
       days = event.rrule[0].by_day
-      current_week_day = convert_weekday_index_to_ics(date.now.strftime("%w").to_i) # TODO: Law of demeter
+      current_week_day = convert_weekday_index_to_ics(date.strftime("%w").to_i) # TODO: Law of demeter
       if days.include? current_week_day # If event is given day add
-        @student_events.push(event)
+        parsed_event = StudentEvent.new
+        parsed_event.parse(event)
+        @student_events.push(parsed_event)
       end
     end
-
-    @student_events.sort_by(&:start_time)
+    @student_events.sort_by {|event| event.start_time}
   end
 end
 
@@ -91,7 +96,8 @@ def find_meal_timings(day_events)
 
   meals_for_day = []
   timings.each_with_index do |timing, index|
-    possible_intervals = get_intervals_in_range(day_events, timings[0], timings[1])
+    possible_intervals = get_intervals_in_range(day_events, timing[0], timing[1])
+    # puts "Possible intervals: #{possible_intervals.length}"
 
     # TODO: Move get right interval into it's own function
     # Find the largest meal timing or first one that's 2 hours in length
@@ -107,8 +113,10 @@ def find_meal_timings(day_events)
     end
 
     meal_timing.summary = meals[index]
-    before_hall = find_location_before(meal_timing, day_events)
-    after_hall = find_location_after(meal_timing, day_events)
+    before_hall = find_location_before(meal_timing.start_time, day_events)
+    after_hall = find_location_after(meal_timing.end_time, day_events)
+    # puts meal_timing
+    # puts "Before hall #{before_hall}, after hall #{after_hall}"
     meal_timing.location = find_dining_hall_with_least_walking_time(before_hall, after_hall)
     meals_for_day.push meal_timing
   end
@@ -121,17 +129,22 @@ def get_intervals_in_range(day_events, start_point, end_point)
   # Note that this is basically like a sorta inversion, so expect code to be something like that
   intervals = []
 
+  # puts "For #{start_point} to #{end_point}"
   # Find true starting point
-  day_events.each do |event|
+  day_events.student_events.each do |event|
     start_point = event.end_time if event.timing_within_event? start_point
   end
   interval = StudentEvent.new
   interval.start_time = start_point
 
+  #puts "The start point is #{start_point} and end point #{end_point}"
   # Loop through the rest
   found_first_event = false
-  day_events.each do |event|
+  #puts "#{day_events.student_events.length} events being considered here"
+  day_events.student_events.each do |event|
+    #puts "Consider #{event}"
     if event.end_time < end_point && event.start_time > start_point
+      # puts "Do we ever get here"
       found_first_event = true
       interval.end_time = event.start_time
       intervals.push interval
@@ -145,7 +158,7 @@ def get_intervals_in_range(day_events, start_point, end_point)
   # Find true ending point
   # TODO: Simplify this block (I think the if case is unneeded)
   if found_first_event
-    day_events.each do |event|
+    day_events.student_events.each do |event|
       if event.timing_within_event? end_point
         end_point = event.start_time
       end
@@ -159,11 +172,11 @@ def get_intervals_in_range(day_events, start_point, end_point)
     intervals.push interval
   end
 
-  return interval
+  return intervals
 end
 
 def convert_weekday_index_to_ics(weekday_id)
-  mapping = %w{MO TU WE TH FR SA SU}
+  mapping = %w{SU MO TU WE TH FR SA}
   mapping[weekday_id]
 end
 
@@ -171,7 +184,7 @@ end
 def find_location_before(time, day_events)
   location_before = "" # Placeholder
   min_diffence = 120 # Placeholder
-  day_events.each do |event|
+  day_events.student_events.each do |event|
     difference = time - event.end_time
     if difference > 0
       if (difference < min_diffence)
@@ -187,8 +200,8 @@ end
 def find_location_after(time, day_events)
   location_after = "" # Placeholder
   min_diffence = 120 # Placeholder
-  day_events.each do |event|
-    difference = event.start_time - event
+  day_events.student_events.each do |event|
+    difference = event.start_time - time
     if difference > 0
       if (difference < min_diffence)
         min_diffence = difference
@@ -201,16 +214,19 @@ def find_location_after(time, day_events)
 end
 
 def find_dining_hall_with_least_walking_time(location_before, location_after)
-  dining_halls = ["Busey-Evans Dining Hall",
-                  "Florida Avenue (FAR) Dining Hall",
+  # TODO: Make dining halls adjustable
+  dining_halls = ["Florida Avenue (FAR) Dining Hall",
                   "Illini Union",
                   "Lincoln Avenue (LAR) Dining Hall",
-                  "Ikenberry Dining Center - SDRP",
+                  "Ikenberry Dining Center SDRP",
                   "Pennsylvania Avenue (PAR) Dining Hall"]
   min_time = 120 # Some large value TODO: This is terrible code
   least_walking_hall = "University dining" # Placeholder value
   dining_halls.each do |hall|
-    time = query_walking_distance(before, hall) + query_walking_distance(after, hall)
+    time = 0
+    time += query_walking_distance(location_before, hall) unless location_before.empty?
+    time += query_walking_distance(location_after, hall) unless location_after.empty?
+
     if time < min_time
       least_walking_hall = hall
       min_time = time
@@ -222,8 +238,8 @@ end
 
 def query_walking_distance(place1, place2)
   # Remove part after room for both
-  place1 = place1.split("Room:")[0]
-  place2 = place2.split("Room:")[0]
+  place1 = place1.split("Room:")[0].gsub(" ", "+")
+  place2 = place2.split("Room:")[0].gsub(" ", "+")
 
   # Check if it exists in the cache (the hash), otherwise do a request TODO: Move this to it's own block
   place_pair = "/#{place1};#{place2}"
@@ -244,29 +260,6 @@ end
 
 # Returns a string representing an ics
 def convert_to_ics(semester_schedule)
-  # TODO: Adjust for daylight savings and timezones
-  cal = setup_ical_for_chicago_dst(cal)
-  days = semester_schedule.schedule
-  days.each do |day|
-    date = days
-    day.student_events.each do |event|
-      date = day.date.strftime("%Y%m%d")
-      cal.event do |e|
-        start_date_time = date + event.start_time.to_s
-        e.dtstart     = Icalendar::Values::DateOrDateTime.new(start_date_time)
-
-        end_date_time = date + event.start_time.to_s
-        e.dtend       = Icalendar::Values::DateOrDateTime.new(end_date_time)
-        e.summary     = event.summary
-        e.description = "Have a nice and wholesome meal!"
-      end
-    end
-  end
-
-  cal.publish
-end
-
-def setup_ical_for_chicago_dst(cal)
   cal = Icalendar::Calendar.new
   cal.timezone do |t|
     t.tzid = "America/Chicago"
@@ -287,11 +280,35 @@ def setup_ical_for_chicago_dst(cal)
       s.rrule        = "FREQ=YEARLY;BYMONTH=11;BYDAY=1SU"
     end
   end
+
+  days = semester_schedule.schedule
+  days.each do |day|
+    dateObject = day.date
+    day.student_events.each do |event|
+      date = dateObject.strftime("%Y%m%d")
+      cal.event do |e|
+        start_date_time = dateObject.to_time #(date + event.start_time.to_s).to_i
+        start_date_time = start_date_time + (event.start_time / 100) * 3600 + (event.start_time % 100) * 60
+        e.dtstart     = Icalendar::Values::DateOrDateTime.new(start_date_time)
+
+        end_date_time = dateObject.to_time #(date + event.start_time.to_s).to_i
+        end_date_time = end_date_time + (event.end_time / 100) * 3600 + (event.end_time % 100) * 60
+        e.dtend       = Icalendar::Values::DateOrDateTime.new(end_date_time)
+        e.summary     = event.summary
+        e.location    = event.location
+        e.description = "Have a nice and wholesome meal!"
+      end
+    end
+  end
+
+  cal.publish
+  cal
+  puts cal.to_ical
 end
 
 # For now just be a thin wrapper to java
 #get '/' do
-  file = File.open('Fall 2018 - Urbana-Champaign.ics')
+  file = File.open('Fall 2018 - Urbana-Champaign.ics') # MAHA TODO:
   # Open a file or pass a string to the parse
   cals = Icalendar::Calendar.parse(file)
   cal = cals.first
@@ -308,25 +325,28 @@ end
   while end_date >= current_date
     # Exclude weekends
     unless current_date.saturday? || current_date.sunday?
-    	# puts current_date
+    	puts current_date
       day_events = DayEvents.new(current_date)
       day_events.pick_out_given_days_events(events)
+
+      # puts "Day has #{day_events.student_events.length} events"
+      day_events.student_events.each do |event|
+        # puts event
+      end
+
     	meal_timings = find_meal_timings(day_events)
-      schedule.add_new_day(meal_timings)
+      day_events.student_events = meal_timings
+      schedule.add_new_day(day_events)
     end
     current_date = current_date.next_day
   end
 
   ical_file = convert_to_ics(schedule)
-
-  events.each do |event|
-    puts "location #{event.location}"
-    puts "rrule #{event.rrule[0].by_day}"
-    puts "start date-time timezone: #{event.dtstart.ical_params['tzid']}"
-    puts "summary: #{event.summary}"
-  end
-
-  puts ical_file
+  # MAHA TODO: Return this back to use
   
   Utility.new.get_final_string
 #end
+
+# MAHA TODO: Fix the time crossing bug (similar to java)
+# MAHA TODO: Deploy to prod
+# MAHA TODO: Accept ICS files
