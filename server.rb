@@ -2,6 +2,7 @@ require 'sinatra'
 require 'icalendar'
 require 'pry'
 require 'net/http'
+require 'json'
 
 $distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
@@ -263,6 +264,7 @@ end
 
 # Returns a string representing an ics
 def convert_to_ics(semester_schedule)
+  # TODO: Check if the ics actually has all the expected events
   cal = Icalendar::Calendar.new
   cal.timezone do |t|
     t.tzid = "America/Chicago"
@@ -309,57 +311,8 @@ def convert_to_ics(semester_schedule)
   return cal.to_ical
 end
 
-=begin
-# For now just be a thin wrapper to java
-class App < Sinatra::Base
-  get '/' do
-    $distance_cache = {} # Store the results so that we don't end up hitting the server again and again
-
-    file = File.open('Fall 2018 - Urbana-Champaign.ics') # MAHA TODO: Take file input
-    # Open a file or pass a string to the parse
-    cals = Icalendar::Calendar.parse(file)
-    cal = cals.first
-    events = cal.events
-
-    # TODO: Un-hardcode it
-    start_date = Date.new(2018,8,29)
-    end_date = Date.new(2018,9,7) # should be 2018,12,12
-
-    schedule = SemesterSchedule.new(start_date, end_date)
-
-    # Look from start to end
-    current_date = start_date
-    while end_date >= current_date
-      # Exclude weekends
-      unless current_date.saturday? || current_date.sunday?
-        puts
-        puts current_date
-        day_events = DayEvents.new(current_date)
-        day_events.pick_out_given_days_events(events)
-
-        # puts "Day has #{day_events.student_events.length} events"
-        day_events.student_events.each do |event|
-          # puts event
-        end
-
-        meal_timings = find_meal_timings(day_events)
-        day_events.student_events = meal_timings
-        schedule.add_new_day(day_events)
-      end
-      current_date = current_date.next_day
-    end
-
-    ical_file = convert_to_ics(schedule)
-    # MAHA TODO: Return this back to use
-
-    # puts ical_file
-    ical_file
-    # Utility.new.get_final_string
-  end
-end
-=end
-
 get '/' do
+  content_type :json
   $distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
   file = File.open('Fall 2018 - Urbana-Champaign.ics') # MAHA TODO: Take file input
@@ -368,9 +321,9 @@ get '/' do
   cal = cals.first
   events = cal.events
 
-  # TODO: Un-hardcode it
+  # TODO: Un-hardcode ithar
   start_date = Date.new(2018,8,29)
-  end_date = Date.new(2018,9,7) # should be 2018,12,12
+  end_date = Date.new(2018,12,12) # should be 2018,12,12
 
   schedule = SemesterSchedule.new(start_date, end_date)
 
@@ -400,7 +353,8 @@ get '/' do
   # MAHA TODO: Return this back to use
 
   # puts ical_file
-  ical_file
+  hash = { result: ical_file}
+  hash.to_json
   # Utility.new.get_final_string
 end
 
