@@ -3,7 +3,7 @@ require 'icalendar'
 require 'pry'
 require 'net/http'
 
-@distance_cache = {} # Store the results so that we don't end up hitting the server again and again
+$distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
 # TODO: See if it's possible to split this into multiple files
 # TODO: Consider the actual meal timings of all the dining halls (get it somehow from uiuc website)
@@ -247,16 +247,16 @@ def query_walking_distance(place1, place2)
   # Check if it exists in the cache (the hash), otherwise do a request TODO: Move this to it's own block
   place_pair = "/#{place1};#{place2}"
   place_pair2 = "/#{place2};#{place1}"
-  if @distance_cache.has_key? place_pair
-    return @distance_cache[place_pair]
-  elsif @distance_cache.has_key? place_pair2
-    return @distance_cache[place_pair2]
+  if $distance_cache.has_key? place_pair
+    return $distance_cache[place_pair]
+  elsif $distance_cache.has_key? place_pair2
+    return $distance_cache[place_pair2]
   else
     base_url = "https://walk-time-calculator.herokuapp.com"
     full_url = base_url + place_pair
     uri = URI(full_url)
     result = Net::HTTP.get(uri).to_f
-    @distance_cache[place_pair] = result
+    $distance_cache[place_pair] = result
     return result
   end
 end
@@ -310,8 +310,10 @@ def convert_to_ics(semester_schedule)
 end
 
 # For now just be a thin wrapper to java
-#get '/' do
-  file = File.open('Fall 2018 - Urbana-Champaign.ics') # MAHA TODO:
+get '/' do
+  $distance_cache = {} # Store the results so that we don't end up hitting the server again and again
+
+  file = File.open('Fall 2018 - Urbana-Champaign.ics') # MAHA TODO: Take file input
   # Open a file or pass a string to the parse
   cals = Icalendar::Calendar.parse(file)
   cal = cals.first
@@ -349,9 +351,9 @@ end
   # MAHA TODO: Return this back to use
 
   # puts ical_file
-  Utility.new.get_final_string
-#end
+  ical_file
+  # Utility.new.get_final_string
+end
 
 # MAHA TODO: Fix the time crossing bug (similar to java)
 # MAHA TODO: Deploy to prod
-# MAHA TODO: Accept ICS files
