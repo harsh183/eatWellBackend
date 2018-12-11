@@ -35,7 +35,7 @@ class StudentEvent
   end
 
   def timing_within_event?(timing)
-    @start_time < timing && timing > @start_time
+    @start_time < timing && timing < @end_time
   end
 
   def duration
@@ -66,7 +66,7 @@ class DayEvents
         @student_events.push(parsed_event)
       end
     end
-    @student_events.sort_by {|event| event.start_time}
+    @student_events = @student_events.sort_by {|event| event.start_time}
   end
 end
 
@@ -97,15 +97,17 @@ def find_meal_timings(day_events)
   meals_for_day = []
   timings.each_with_index do |timing, index|
     possible_intervals = get_intervals_in_range(day_events, timing[0], timing[1])
-    # puts "Possible intervals: #{possible_intervals.length}"
+    puts "Possible intervals: #{possible_intervals.length}"
 
     # TODO: Move get right interval into it's own function
     # Find the largest meal timing or first one that's 2 hours in length
     meal_timing = possible_intervals[0]
     possible_intervals.each do |interval|
       duration = interval.duration
+      puts "Possible: #{meal_timing} at #{duration}"
       if duration >= 120
         meal_timing = interval
+        meal_timing.end_time = meal_timing.start_time + 200
         break
       elsif duration > meal_timing.duration
         meal_timing = interval
@@ -115,7 +117,7 @@ def find_meal_timings(day_events)
     meal_timing.summary = meals[index]
     before_hall = find_location_before(meal_timing.start_time, day_events)
     after_hall = find_location_after(meal_timing.end_time, day_events)
-    # puts meal_timing
+    puts meal_timing
     # puts "Before hall #{before_hall}, after hall #{after_hall}"
     meal_timing.location = find_dining_hall_with_least_walking_time(before_hall, after_hall)
     meals_for_day.push meal_timing
@@ -126,16 +128,17 @@ end
 
 def get_intervals_in_range(day_events, start_point, end_point)
   # TODO: This function is pretty long - Cleanup this logic sometime DRY and simplify a little
+  # TODO: Remove the * 1
   # Note that this is basically like a sorta inversion, so expect code to be something like that
   intervals = []
 
-  # puts "For #{start_point} to #{end_point}"
   # Find true starting point
   day_events.student_events.each do |event|
-    start_point = event.end_time if event.timing_within_event? start_point
+    start_point = event.end_time * 1 if event.timing_within_event? start_point
   end
+  puts "For #{start_point} to #{end_point}"
   interval = StudentEvent.new
-  interval.start_time = start_point
+  interval.start_time = start_point * 1
 
   #puts "The start point is #{start_point} and end point #{end_point}"
   # Loop through the rest
@@ -146,10 +149,10 @@ def get_intervals_in_range(day_events, start_point, end_point)
     if event.end_time < end_point && event.start_time > start_point
       # puts "Do we ever get here"
       found_first_event = true
-      interval.end_time = event.start_time
+      interval.end_time = event.start_time * 1
       intervals.push interval
       interval = StudentEvent.new
-      interval.start_time = event.end_time
+      interval.start_time = event.end_time * 1
     elsif found_first_event
       break
     end
@@ -160,15 +163,15 @@ def get_intervals_in_range(day_events, start_point, end_point)
   if found_first_event
     day_events.student_events.each do |event|
       if event.timing_within_event? end_point
-        end_point = event.start_time
+        end_point = event.start_time * 1
       end
     end
-    interval.end_time = end_point
+    interval.end_time = end_point * 1
     intervals.push interval
   else
     interval = StudentEvent.new
-    interval.start_time = start_point
-    interval.end_time = end_point
+    interval.start_time = start_point * 1
+    interval.end_time = end_point * 1
     intervals.push interval
   end
 
@@ -303,7 +306,7 @@ def convert_to_ics(semester_schedule)
 
   cal.publish
   cal
-  puts cal.to_ical
+  return cal.to_ical
 end
 
 # For now just be a thin wrapper to java
@@ -316,7 +319,7 @@ end
 
   # TODO: Un-hardcode it
   start_date = Date.new(2018,8,29)
-  end_date = Date.new(2018,12,12)
+  end_date = Date.new(2018,9,7) # should be 2018,12,12
 
   schedule = SemesterSchedule.new(start_date, end_date)
 
@@ -325,6 +328,7 @@ end
   while end_date >= current_date
     # Exclude weekends
     unless current_date.saturday? || current_date.sunday?
+      puts
     	puts current_date
       day_events = DayEvents.new(current_date)
       day_events.pick_out_given_days_events(events)
@@ -343,7 +347,8 @@ end
 
   ical_file = convert_to_ics(schedule)
   # MAHA TODO: Return this back to use
-  
+
+  # puts ical_file
   Utility.new.get_final_string
 #end
 
