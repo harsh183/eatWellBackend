@@ -9,11 +9,14 @@ require 'net/http'
 # TODO: Make variables consistent
 
 # TODO: Also make a more simplified route that just gets it for a single days worth of events
+
 class Utility
   def get_final_string
     "I've been expecting you"
   end
 end
+
+@distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
 # Represents a single calendar event for the sake of our app
 class StudentEvent
@@ -161,12 +164,25 @@ def convert_weekday_index_to_ics(weekday_id)
 end
 
 def query_walking_distance(place1, place2)
-  # MAHA TODO: Implement cache (remember that reversed is the same)
-  # MAHA TODO: Remove room no from both
-  base_url = "https://walk-time-calculator.herokuapp.com"
-  full_url = base_url + "/#{place1};#{place2}"
-  uri = URI(full_url)
-  Net::HTTP.get(uri)
+  # Remove part after room for both
+  place1 = place1.split("Room:")[0]
+  place2 = place2.split("Room:")[0]
+
+  # Check if it exists in the cache (the hash), otherwise do a request TODO: Move this to it's own block
+  place_pair = "/#{place1};#{place2}"
+  place_pair2 = "/#{place2};#{place1}"
+  if @distance_cache.has_key? place_pair
+    return @distance_cache[place_pair]
+  elsif @distance_cache.has_key? place_pair2
+    return @distance_cache[place_pair2]
+  else
+    base_url = "https://walk-time-calculator.herokuapp.com"
+    full_url = base_url + place_pair
+    uri = URI(full_url)
+    result = Net::HTTP.get(uri).to_f
+    @distance_cache[place_pair] = result
+    return result
+  end
 end
 
 # Returns a string representing an ics
