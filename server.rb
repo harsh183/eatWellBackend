@@ -98,14 +98,14 @@ def find_meal_timings(day_events)
   meals_for_day = []
   timings.each_with_index do |timing, index|
     possible_intervals = get_intervals_in_range(day_events, timing[0], timing[1])
-    puts "Possible intervals: #{possible_intervals.length}"
+    #puts "Possible intervals: #{possible_intervals.length}"
 
     # TODO: Move get right interval into it's own function
     # Find the largest meal timing or first one that's 2 hours in length
     meal_timing = possible_intervals[0]
     possible_intervals.each do |interval|
       duration = interval.duration
-      puts "Possible: #{meal_timing} at #{duration}"
+      # puts "Possible: #{meal_timing} at #{duration}"
       if duration >= 120
         meal_timing = interval
         meal_timing.end_time = meal_timing.start_time + 200
@@ -118,7 +118,7 @@ def find_meal_timings(day_events)
     meal_timing.summary = meals[index]
     before_hall = find_location_before(meal_timing.start_time, day_events)
     after_hall = find_location_after(meal_timing.end_time, day_events)
-    puts meal_timing
+    # puts meal_timing
     # puts "Before hall #{before_hall}, after hall #{after_hall}"
     meal_timing.location = find_dining_hall_with_least_walking_time(before_hall, after_hall)
     meals_for_day.push meal_timing
@@ -137,7 +137,7 @@ def get_intervals_in_range(day_events, start_point, end_point)
   day_events.student_events.each do |event|
     start_point = event.end_time * 1 if event.timing_within_event? start_point
   end
-  puts "For #{start_point} to #{end_point}"
+  # puts "For #{start_point} to #{end_point}"
   interval = StudentEvent.new
   interval.start_time = start_point * 1
 
@@ -241,6 +241,7 @@ def find_dining_hall_with_least_walking_time(location_before, location_after)
 end
 
 def query_walking_distance(place1, place2)
+  #TODO: Test the estimates for this
   # Remove part after room for both
   place1 = place1.split("Room:")[0].gsub(" ", "+")
   place2 = place2.split("Room:")[0].gsub(" ", "+")
@@ -311,13 +312,25 @@ def convert_to_ics(semester_schedule)
   return cal.to_ical
 end
 
-get '/' do
+# TODO: Move other helpers here too
+helpers do
+  def json_params
+    begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, { message:'Invalid JSON' }.to_json
+    end
+  end
+end
+
+post '/' do
   content_type :json
   $distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
-  file = File.open('Fall 2018 - Urbana-Champaign.ics') # MAHA TODO: Take file input
+  # Now extract the string from json {"content": "[...]"}
+  string = json_params["content"]
   # Open a file or pass a string to the parse
-  cals = Icalendar::Calendar.parse(file)
+  cals = Icalendar::Calendar.parse(string)
   cal = cals.first
   events = cal.events
 
@@ -332,7 +345,7 @@ get '/' do
   while end_date >= current_date
     # Exclude weekends
     unless current_date.saturday? || current_date.sunday?
-      puts
+      # puts
       puts current_date
       day_events = DayEvents.new(current_date)
       day_events.pick_out_given_days_events(events)
@@ -355,8 +368,8 @@ get '/' do
   # puts ical_file
   hash = { result: ical_file}
   hash.to_json
-  # Utility.new.get_final_string
 end
 
 # MAHA TODO: Fix the time crossing bug (similar to java)
+# MAHA TODO: Check how good the distance checking
 # MAHA TODO: Deploy to prod
