@@ -119,6 +119,7 @@ def find_meal_timings(day_events)
     meals_for_day.push meal_timing
   end
 
+  # puts "These many meals today: #{meals_for_day.length}"
   return meals_for_day
 end
 
@@ -285,6 +286,7 @@ def convert_to_ics(semester_schedule)
   days = semester_schedule.schedule
   days.each do |day|
     dateObject = day.date
+    puts "for #{dateObject} add #{day.student_events.length} events"
     day.student_events.each do |event|
       date = dateObject.strftime("%Y%m%d")
       cal.event do |e|
@@ -323,6 +325,7 @@ def generate_meals_array(meals_json)
     $meals.push "Dinner"
     $timings.push [1600, 2000]
   end
+  puts $meals.inspect
 end
 
 # TODO: Move other helpers here too
@@ -337,6 +340,9 @@ helpers do
 end
 
 post '/' do
+  $meals = []
+  $timings = []
+
   content_type :json
   $distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
