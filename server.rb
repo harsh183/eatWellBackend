@@ -14,6 +14,9 @@ $distance_cache = {} # Store the results so that we don't end up hitting the ser
 
 # TODO: Also make a more simplified route that just gets it for a single days worth of events
 
+# MAHA TODO: Fix these global variables (sort out scope) god why do I do this to myself
+$meals = []
+$timings = []
 # Represents a single calendar event for the sake of our app
 class StudentEvent
   attr_accessor :location, :start_time, :end_time, :summary, :until_date
@@ -86,11 +89,9 @@ def find_meal_timings(day_events)
   # TODO: Also todo, stop using hh:mm number
   # TODO: Make this into another object
   # MAHA TODO: Account for customizable meal timings (I'm guessing chop off the unwanted meals)
-  meals = %w(Breakfast Lunch Dinner)
-  timings = [[700, 1030], [1030, 1500], [1600, 2000]]
 
   meals_for_day = []
-  timings.each_with_index do |timing, index|
+  $timings.each_with_index do |timing, index|
     possible_intervals = get_intervals_in_range(day_events, timing[0], timing[1])
     #puts "Possible intervals: #{possible_intervals.length}"
 
@@ -109,7 +110,7 @@ def find_meal_timings(day_events)
       end
     end
 
-    meal_timing.summary = meals[index]
+    meal_timing.summary = $meals[index]
     before_hall = find_location_before(meal_timing.start_time, day_events)
     after_hall = find_location_after(meal_timing.end_time, day_events)
     # puts meal_timing
@@ -306,6 +307,24 @@ def convert_to_ics(semester_schedule)
   return cal.to_ical
 end
 
+# TODO: Make a meals class so that this can be abstracted away
+def generate_meals_array(meals_json)
+  if meals_json["breakfast"]
+    $meals.push "Breakfast"
+    $timings.push [700, 1030]
+  end
+
+  if meals_json["lunch"]
+    $meals.push "Lunch"
+    $timings.push [1030, 1500]
+  end
+
+  if meals_json["dinner"]
+    $meals.push "Dinner"
+    $timings.push [1600, 2000]
+  end
+end
+
 # TODO: Move other helpers here too
 helpers do
   def json_params
@@ -321,10 +340,16 @@ post '/' do
   content_type :json
   $distance_cache = {} # Store the results so that we don't end up hitting the server again and again
 
+  puts "Processing request"
   # Now extract the string from json {"content": "[...]"}
-  string = json_params["content"]
+  json_response = json_params
+  ics_string = json_response["content"]
+  puts ics_string
+
+  generate_meals_array(json_response)
+
   # Open a file or pass a string to the parse
-  cals = Icalendar::Calendar.parse(string)
+  cals = Icalendar::Calendar.parse(ics_string)
   cal = cals.first
   events = cal.events
 
