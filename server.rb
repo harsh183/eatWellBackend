@@ -14,12 +14,6 @@ $distance_cache = {} # Store the results so that we don't end up hitting the ser
 
 # TODO: Also make a more simplified route that just gets it for a single days worth of events
 
-class Utility
-  def get_final_string
-    "Execute order 66" # TODO: Placeholder for now, put some other status thing later
-  end
-end
-
 # Represents a single calendar event for the sake of our app
 class StudentEvent
   attr_accessor :location, :start_time, :end_time, :summary, :until_date
