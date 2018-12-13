@@ -214,11 +214,11 @@ end
 
 def find_dining_hall_with_least_walking_time(location_before, location_after)
   # TODO: Make dining halls adjustable
-  dining_halls = ["Florida Avenue (FAR) Dining Hall",
-                  "Illini Union",
-                  "Lincoln Avenue (LAR) Dining Hall",
-                  "Ikenberry Dining Center SDRP",
-                  "Pennsylvania Avenue (PAR) Dining Hall"]
+  dining_halls = ["Illini Union, Urbana, 61801",
+                  "Lincoln Avenue (LAR) Dining Hall, Urbana IL 61801 ",
+                  "Ikenberry Dining Center SDRP, Champaign IL 61820",
+                  "Pennsylvania Avenue (PAR) Dining Hall, Urbana, IL 61801 "]
+                  # "Florida Avenue (FAR) Dining Hall, Urbana, IL 61801 "
   min_time = 120 # Some large value TODO: This is terrible code
   least_walking_hall = "University dining" # Placeholder value
   dining_halls.each do |hall|
